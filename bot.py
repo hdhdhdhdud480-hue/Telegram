@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = '8868918414:AAE7kUpC6aGfGeRzdASf7cKYWRwkhhhVZwA'  # <--- ВСТАВЬ СЮДА СВОЙ ТОКЕН
-WEBAPP_URL = 'genuine-creativity-production-1d853656.up.railway.app' # ВРЕМЕННАЯ ССЫЛКА (Telegram требует HTTPS)
+WEBAPP_URL = 'genuine-creativity-production-58b6a574.up.railway.app' # ВРЕМЕННАЯ ССЫЛКА (Telegram требует HTTPS)
 
 logging.basicConfig(level=logging.INFO)
 
