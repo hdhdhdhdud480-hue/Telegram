@@ -6,26 +6,21 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 # --- НАСТРОЙКИ ---
-BOT_TOKEN = '8868918414:AAE7kUpC6aGfGeRzdASf7cKYWRwkhhhVZwA'  # <--- ВСТАВЬ СЮДА СВОЙ ТОКЕН
-WEBAPP_URL = 'genuine-creativity-production-58b6a574.up.railway.app' # ВРЕМЕННАЯ ССЫЛКА (Telegram требует HTTPS)
+BOT_TOKEN = '8868918414:AAE7kUpC6aGfGeRzdASf7cKYWRwkhhhVZwA'
+WEBAPP_URL = 'https://genuine-creativity-production-58b6a574.up.railway.app'
 
 logging.basicConfig(level=logging.INFO)
 
-# Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- ОБРАБОТЧИК КОМАНДЫ /start ---
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Создаем кнопку, которая открывает WebApp (мини-игру)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎮 Открыть игру", web_app=WebAppInfo(url=WEBAPP_URL))]
     ])
     await message.answer("Привет! Нажми на кнопку ниже, чтобы открыть кейс-фарм.", reply_markup=kb)
 
-# --- HTML/JS КОД МИНИ-ИГРЫ ---
-# (Здесь весь интерфейс, который мы делали ранее, + новый SVG AK47)
 HTML_GAME = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -89,7 +84,6 @@ HTML_GAME = """
 
     #snowCanvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
-    /* Экран кейсов */
     #casesScreen { justify-content: flex-start; gap: 15px; }
     .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
     .balance { font-size: 20px; font-weight: bold; color: #333; background-color: #e6e6e6; padding: 6px 14px; border-radius: 6px; }
@@ -103,7 +97,6 @@ HTML_GAME = """
     }
     .case-btn:active { background-color: #707070; }
 
-    /* Экран открытия */
     #openScreen { justify-content: space-between; gap: 10px; }
     .open-top { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
     .open-title { font-size: 18px; font-weight: bold; color: #333; }
@@ -138,19 +131,13 @@ HTML_GAME = """
     .result-msg { font-size: 16px; font-weight: bold; color: #2a7d2a; z-index: 2; min-height: 20px; text-align: center; }
     body.dark .result-msg { color: #7dff7d; }
 
-    /* Новый качественный AK-47 */
-    .ak-svg {
-        width: 90px;
-        height: 45px;
-        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
-    }
+    .ak-svg { width: 90px; height: 45px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
 </style>
 </head>
 <body>
 
 <canvas id="snowCanvas"></canvas>
 
-<!-- ГЛАВНЫЙ ЭКРАН -->
 <div class="screen active" id="mainScreen">
     <h1>Кейсы</h1>
     <div class="content">
@@ -160,7 +147,6 @@ HTML_GAME = """
     <button class="btn">Свободный режим</button>
 </div>
 
-<!-- ЭКРАН НАСТРОЕК -->
 <div class="screen" id="settingsScreen">
     <h1>Настройки</h1>
     <div class="settings-info">
@@ -179,7 +165,6 @@ HTML_GAME = """
     <button class="btn" id="backBtn">Назад</button>
 </div>
 
-<!-- ЭКРАН КЕЙСОВ -->
 <div class="screen" id="casesScreen">
     <div class="top-bar">
         <div class="balance" id="balanceDisplay">1$</div>
@@ -190,21 +175,17 @@ HTML_GAME = """
     </div>
 </div>
 
-<!-- ЭКРАН ОТКРЫТИЯ КЕЙСА -->
 <div class="screen" id="openScreen">
     <div class="open-top">
         <div class="open-title" id="openTitle">Кейс 1$</div>
         <div class="balance" id="openBalance">1$</div>
     </div>
-
     <div class="roulette-wrap">
         <div class="roulette-strip" id="rouletteStrip"></div>
         <div class="roulette-center-line"></div>
     </div>
-
     <div class="chances" id="chancesList"></div>
     <div class="result-msg" id="resultMsg"></div>
-
     <div class="open-bottom">
         <button class="btn" id="openCaseBtn" style="font-size:16px; padding:12px 24px;">Открыть</button>
         <button class="btn" id="fastSpinBtn" style="font-size:16px; padding:12px 24px;">Быстро</button>
@@ -213,13 +194,10 @@ HTML_GAME = """
 </div>
 
 <script>
-    // Инициализация Telegram WebApp
     let tg = window.Telegram.WebApp;
-    tg.expand(); // Разворачиваем на весь экран
+    tg.expand();
 
-    const state = {
-        snow: false, dark: false, balance: 1, currentCase: null, spinning: false, pendingWin: null
-    };
+    const state = { snow: false, dark: false, balance: 1, currentCase: null, spinning: false, pendingWin: null };
 
     const mainScreen = document.getElementById('mainScreen');
     const settingsScreen = document.getElementById('settingsScreen');
@@ -277,7 +255,7 @@ HTML_GAME = """
 
     function formatMoney(v) {
         if (Number.isInteger(v)) return v + '$';
-        return v.toFixed(2).replace(/\.?0+$/, '') + '$';
+        return v.toFixed(2).replace(/\\.?0+$/, '') + '$';
     }
 
     const CASE_PRICES = [1, 5, 25, 100, 500, 2500, 12500, 62500, 312500, 1000000];
@@ -314,52 +292,34 @@ HTML_GAME = """
         stopSpin();
     }
 
-    // ТОТ САМЫЙ КРАСИВЫЙ AK-47 КАК НА ФОТО
     function getAkSvg(woodColor = '#d4883d', metalColor = '#5c5c5c') {
         return `<svg class="ak-svg" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
-            <!-- Ствол и газовая трубка -->
             <rect x="120" y="35" width="70" height="6" fill="${metalColor}" stroke="#333" stroke-width="1"/>
             <rect x="120" y="28" width="50" height="7" fill="#3a3a3a" stroke="#222" stroke-width="1"/>
             <rect x="170" y="30" width="20" height="3" fill="#222" stroke="#222" stroke-width="1"/>
-            
-            <!-- Мушка -->
             <path d="M 175 35 L 178 25 L 182 25 L 185 35 Z" fill="#3a3a3a" stroke="#222" stroke-width="1"/>
             <rect x="178" y="20" width="4" height="5" fill="#222"/>
-
-            <!-- Цевье -->
             <path d="M 100 30 L 130 30 L 130 52 L 100 52 Z" fill="${woodColor}" stroke="#6b3f1b" stroke-width="1.5"/>
             <rect x="105" y="35" width="20" height="2" fill="#6b3f1b" opacity="0.6"/>
             <rect x="105" y="42" width="20" height="2" fill="#6b3f1b" opacity="0.6"/>
-
-            <!-- Ресивер -->
             <path d="M 60 30 L 100 30 L 105 55 L 60 55 Z" fill="${metalColor}" stroke="#222" stroke-width="1.5"/>
-            <rect x="65" y="33" width="30" height="4" fill="#444" stroke="#222" stroke-width="1"/> <!-- Затвор -->
-            <path d="M 70 28 L 85 28 L 80 32 L 65 32 Z" fill="#444" stroke="#222" stroke-width="1"/> <!-- Крышка ствольной коробки -->
-
-            <!-- Магазин -->
+            <rect x="65" y="33" width="30" height="4" fill="#444" stroke="#222" stroke-width="1"/>
+            <path d="M 70 28 L 85 28 L 80 32 L 65 32 Z" fill="#444" stroke="#222" stroke-width="1"/>
             <path d="M 75 55 L 100 55 L 105 75 L 80 75 Z" fill="${metalColor}" stroke="#222" stroke-width="1.5"/>
-            <path d="M 82 58 L 98 58 L 102 72 L 86 72 Z" fill="#3a3a3a" /> <!-- Изгиб магазина -->
-            <rect x="84" y="62" width="12" height="2" fill="#555" /> <!-- Ребра магазина -->
+            <path d="M 82 58 L 98 58 L 102 72 L 86 72 Z" fill="#3a3a3a" />
+            <rect x="84" y="62" width="12" height="2" fill="#555" />
             <rect x="85" y="66" width="10" height="2" fill="#555" />
-
-            <!-- Пистолетная рукоятка -->
             <path d="M 60 55 L 70 55 L 65 75 L 55 75 Z" fill="${woodColor}" stroke="#6b3f1b" stroke-width="1.5"/>
             <rect x="57" y="62" width="8" height="2" fill="#6b3f1b" opacity="0.6"/>
-
-            <!-- Приклад -->
             <path d="M 25 35 L 60 32 L 62 52 L 25 55 Z" fill="${woodColor}" stroke="#6b3f1b" stroke-width="1.5"/>
             <rect x="30" y="40" width="15" height="2" fill="#6b3f1b" opacity="0.5"/>
             <rect x="30" y="46" width="15" height="2" fill="#6b3f1b" opacity="0.5"/>
-            <path d="M 25 35 L 20 36 L 20 54 L 25 55 Z" fill="#5a2e0c" stroke="#333" stroke-width="1"/> <!-- Затыльник приклада -->
-
-            <!-- Спусковой крючок и скоба -->
+            <path d="M 25 35 L 20 36 L 20 54 L 25 55 Z" fill="#5a2e0c" stroke="#333" stroke-width="1"/>
             <path d="M 75 55 L 85 55 L 85 60 Q 80 65 75 60 Z" fill="#222" />
             <circle cx="80" cy="58" r="2" fill="#222"/>
             <rect x="82" y="55" width="3" height="6" fill="#222"/>
-
-            <!-- Дополнительные детали -->
-            <rect x="120" y="53" width="10" height="4" fill="#333" /> <!-- Антабка -->
-            <rect x="160" y="42" width="25" height="2" fill="#222" /> <!-- Шомпол -->
+            <rect x="120" y="53" width="10" height="4" fill="#333" />
+            <rect x="160" y="42" width="25" height="2" fill="#222" />
         </svg>`;
     }
 
@@ -375,19 +335,15 @@ HTML_GAME = """
     function makeRouletteItem(skin) {
         const div = document.createElement('div');
         div.className = 'roulette-item';
-        
-        // Цвета для разных редкостей
         const colors = [
-            { wood: '#d4883d', metal: '#5c5c5c' }, // Обычный
-            { wood: '#4a7a5a', metal: '#4a5a6a' }, // Зеленый
-            { wood: '#8b3a3a', metal: '#5a3a3a' }, // Красный
-            { wood: '#3a4a8b', metal: '#3a3a5a' }, // Синий
-            { wood: '#d4af37', metal: '#6b5a1b' }  // Золотой
+            { wood: '#d4883d', metal: '#5c5c5c' },
+            { wood: '#4a7a5a', metal: '#4a5a6a' },
+            { wood: '#8b3a3a', metal: '#5a3a3a' },
+            { wood: '#3a4a8b', metal: '#3a3a5a' },
+            { wood: '#d4af37', metal: '#6b5a1b' }
         ];
-        
         const colorIdx = CASE_MULTIPLIERS.findIndex(m => round2(m) === round2(skin.price / (state.currentCase ? state.currentCase.price : 1)));
         const c = colors[colorIdx >= 0 ? colorIdx : 0];
-        
         div.innerHTML = `
             ${getAkSvg(c.wood, c.metal)}
             <div class="skin-name">${skin.name}</div>
@@ -439,7 +395,7 @@ HTML_GAME = """
         rouletteStrip.style.transform = 'translateX(0)';
 
         state.spinning = true;
-        const itemWidth = 128; // 120 width + 8 margin (4+4)
+        const itemWidth = 128;
         const wrapWidth = rouletteStrip.parentElement.clientWidth;
         const centerOffset = wrapWidth / 2;
         const targetX = -(winnerPos * itemWidth + itemWidth / 2 - centerOffset);
@@ -571,7 +527,6 @@ HTML_GAME = """
 </html>
 """
 
-# --- ЗАПУСК ВЕБ-СЕРВЕРА ДЛЯ МИНИ-ИГРЫ ---
 async def handle(request):
     return web.Response(text=HTML_GAME, content_type='text/html')
 
@@ -579,14 +534,12 @@ app = web.Application()
 app.router.add_get('/', handle)
 
 async def main():
-    # Запускаем веб-сервер на порту 8080 (в фоне)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
     print("Веб-сервер запущен на порту 8080")
     
-    # Запускаем бота
     print("Бот запущен!")
     await dp.start_polling(bot)
 
