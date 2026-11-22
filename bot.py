@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sqlite3
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -14,6 +15,53 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# --- БАЗА ДАННЫХ ---
+def init_db():
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                 (user_id INTEGER PRIMARY KEY, username TEXT, first_name TEXT, balance REAL DEFAULT 1.0)''')
+    conn.commit()
+    conn.close()
+
+def get_user_balance(user_id):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else 1.0
+
+def update_balance_in_db(user_id, username, first_name, new_balance):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO users (user_id, username, first_name, balance) 
+                 VALUES (?, ?, ?, ?) 
+                 ON CONFLICT(user_id) DO UPDATE SET 
+                 balance = excluded.balance,
+                 username = excluded.username,
+                 first_name = excluded.first_name''', (user_id, username, first_name, new_balance))
+    conn.commit()
+    conn.close()
+
+def reset_user_balance(user_id):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute('UPDATE users SET balance = 1.0 WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
+def get_top_players():
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute('SELECT username, first_name, user_id, balance FROM users ORDER BY balance DESC LIMIT 10')
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+init_db()
+
+# --- ОБРАБОТЧИК КОМАНДЫ /start ---
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -21,6 +69,7 @@ async def cmd_start(message: types.Message):
     ])
     await message.answer("Привет! Нажми на кнопку ниже, чтобы открыть кейс-фарм.", reply_markup=kb)
 
+# --- HTML/JS КОД МИНИ-ИГРЫ ---
 HTML_GAME = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -51,7 +100,7 @@ HTML_GAME = """
 
     .screen { display: none; flex-direction: column; align-items: center; justify-content: space-between; width: 100%; flex: 1; z-index: 2; }
     .screen.active { display: flex; }
-    .content { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .content { display: flex; flex-direction: column; align-items: center; gap: 15px; }
 
     .btn {
         background-color: #b0b0b0; color: #fff; border: none; border-radius: 8px;
@@ -132,6 +181,24 @@ HTML_GAME = """
     body.dark .result-msg { color: #7dff7d; }
 
     .ak-svg { width: 90px; height: 45px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
+
+    /* Стили для топа */
+    .top-table { width: 100%; max-width: 350px; background: #e6e6e6; border-radius: 8px; overflow: hidden; z-index: 2; }
+    body.dark .top-table { background: #7d7d7d; }
+    .top-row { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #ccc; font-size: 14px; color: #333; }
+    body.dark .top-row { border-bottom-color: #555; color: #fff; }
+    .top-row:last-child { border-bottom: none; }
+    .top-row:nth-child(1) { background: #f9d71c; font-weight: bold; color: #000; }
+    .top-row:nth-child(2) { background: #c0c0c0; font-weight: bold; color: #000; }
+    .top-row:nth-child(3) { background: #cd7f32; font-weight: bold; color: #000; }
+
+    /* Стили для предупреждения */
+    .warning-box { background: #fff3cd; border: 2px solid #ffc107; padding: 15px; border-radius: 8px; text-align: center; max-width: 300px; z-index: 2; }
+    body.dark .warning-box { background: #4a4a4a; border-color: #888; color: #fff; }
+    .btn-red { background: #dc3545; }
+    .btn-red:hover { background: #c82333; }
+    .btn-green { background: #28a745; }
+    .btn-green:hover { background: #218838; }
 </style>
 </head>
 <body>
@@ -143,6 +210,7 @@ HTML_GAME = """
     <div class="content">
         <button class="btn play-btn" id="playBtn">Играть</button>
         <button class="btn" id="openSettings">Настройки</button>
+        <button class="btn" id="openTop">🏆 Топ игроков</button>
     </div>
     <button class="btn">Свободный режим</button>
 </div>
@@ -162,7 +230,23 @@ HTML_GAME = """
             <span class="setting-label">Темная тема</span>
         </div>
     </div>
-    <button class="btn" id="backBtn">Назад</button>
+    <div class="content" style="margin-bottom: 20px;">
+        <button class="btn btn-red" id="newGameBtn">Новая игра</button>
+        <button class="btn" id="backBtn">Назад</button>
+    </div>
+</div>
+
+<!-- Экран предупреждения -->
+<div class="screen" id="warningScreen">
+    <h1>Внимание</h1>
+    <div class="warning-box">
+        При этом действии вы начнете все сначала, и ваш баланс сбросится до 1$.<br><br>
+        Продолжить?
+    </div>
+    <div class="content">
+        <button class="btn btn-red" id="confirmNewGame">Продолжить</button>
+        <button class="btn btn-green" id="cancelNewGame">Не продолжать</button>
+    </div>
 </div>
 
 <div class="screen" id="casesScreen">
@@ -193,22 +277,39 @@ HTML_GAME = """
     </div>
 </div>
 
+<div class="screen" id="topScreen">
+    <h1>🏆 Топ игроков</h1>
+    <div class="top-table" id="topTable"></div>
+    <button class="btn" id="topExitBtn">Назад</button>
+</div>
+
 <script>
     let tg = window.Telegram.WebApp;
     tg.expand();
 
     const state = { snow: false, dark: false, balance: 1, currentCase: null, spinning: false, pendingWin: null };
+    const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
+    const username = tg.initDataUnsafe.user ? (tg.initDataUnsafe.user.username || '') : '';
+    const firstName = tg.initDataUnsafe.user ? (tg.initDataUnsafe.user.first_name || 'Игрок') : 'Игрок';
 
     const mainScreen = document.getElementById('mainScreen');
     const settingsScreen = document.getElementById('settingsScreen');
     const casesScreen = document.getElementById('casesScreen');
     const openScreen = document.getElementById('openScreen');
+    const topScreen = document.getElementById('topScreen');
+    const warningScreen = document.getElementById('warningScreen');
 
     const playBtn = document.getElementById('playBtn');
     const openSettingsBtn = document.getElementById('openSettings');
     const backBtn = document.getElementById('backBtn');
     const casesExitBtn = document.getElementById('casesExitBtn');
     const openExitBtn = document.getElementById('openExitBtn');
+    const openTopBtn = document.getElementById('openTop');
+    const topExitBtn = document.getElementById('topExitBtn');
+    
+    const newGameBtn = document.getElementById('newGameBtn');
+    const confirmNewGame = document.getElementById('confirmNewGame');
+    const cancelNewGame = document.getElementById('cancelNewGame');
 
     const snowToggle = document.getElementById('snowToggle');
     const snowCheckbox = document.getElementById('snowCheckbox');
@@ -224,17 +325,88 @@ HTML_GAME = """
     const resultMsg = document.getElementById('resultMsg');
     const openCaseBtn = document.getElementById('openCaseBtn');
     const fastSpinBtn = document.getElementById('fastSpinBtn');
+    const topTable = document.getElementById('topTable');
 
     function showScreen(screen) {
-        [mainScreen, settingsScreen, casesScreen, openScreen].forEach(s => s.classList.remove('active'));
+        [mainScreen, settingsScreen, casesScreen, openScreen, topScreen, warningScreen].forEach(s => s.classList.remove('active'));
         screen.classList.add('active');
         updateSnow();
     }
 
-    playBtn.addEventListener('click', () => { updateBalanceUI(); showScreen(casesScreen); });
+    // --- СИНХРОНИЗАЦИЯ С БАЗОЙ ---
+    async function fetchBalance() {
+        if (!userId) return;
+        try {
+            const res = await fetch('/api/get_balance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, username: username, first_name: firstName })
+            });
+            const data = await res.json();
+            state.balance = data.balance;
+            updateBalanceUI();
+        } catch (e) { console.error(e); }
+    }
+
+    async function syncBalance() {
+        if (!userId) return;
+        try {
+            await fetch('/api/update_balance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, username: username, first_name: firstName, balance: state.balance })
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    async function resetBalanceOnServer() {
+        if (!userId) return;
+        try {
+            await fetch('/api/reset_balance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+            state.balance = 1.0;
+            updateBalanceUI();
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadTop() {
+        try {
+            const res = await fetch('/api/get_top');
+            const data = await res.json();
+            topTable.innerHTML = '';
+            if (data.length === 0) {
+                topTable.innerHTML = '<div class="top-row">Пока нет игроков</div>';
+                return;
+            }
+            data.forEach((user, index) => {
+                const div = document.createElement('div');
+                div.className = 'top-row';
+                const name = user.username ? '@' + user.username : (user.first_name || 'ID: ' + user.user_id);
+                div.innerHTML = `<span>${index + 1}. ${name}</span> <span>${user.balance}$</span>`;
+                topTable.appendChild(div);
+            });
+        } catch (e) {
+            topTable.innerHTML = '<div class="top-row">Ошибка загрузки</div>';
+        }
+    }
+
+    playBtn.addEventListener('click', () => { fetchBalance(); showScreen(casesScreen); });
     openSettingsBtn.addEventListener('click', () => showScreen(settingsScreen));
     backBtn.addEventListener('click', () => showScreen(mainScreen));
-    casesExitBtn.addEventListener('click', () => showScreen(mainScreen));
+    casesExitBtn.addEventListener('click', () => { syncBalance(); showScreen(mainScreen); });
+    openTopBtn.addEventListener('click', () => { loadTop(); showScreen(topScreen); });
+    topExitBtn.addEventListener('click', () => showScreen(mainScreen));
+
+    // Логика новой игры
+    newGameBtn.addEventListener('click', () => showScreen(warningScreen));
+    cancelNewGame.addEventListener('click', () => showScreen(settingsScreen));
+    confirmNewGame.addEventListener('click', async () => {
+        await resetBalanceOnServer();
+        showScreen(settingsScreen);
+    });
 
     openExitBtn.addEventListener('click', () => {
         if (state.spinning && state.pendingWin) {
@@ -242,6 +414,7 @@ HTML_GAME = """
             state.balance = round2(state.balance + state.pendingWin.price);
             state.pendingWin = null;
             updateBalanceUI();
+            syncBalance();
         }
         stopSpin();
         showScreen(casesScreen);
@@ -255,7 +428,7 @@ HTML_GAME = """
 
     function formatMoney(v) {
         if (Number.isInteger(v)) return v + '$';
-        return v.toFixed(2).replace(/\\.?0+$/, '') + '$';
+        return v.toFixed(2).replace(/\.?0+$/, '') + '$';
     }
 
     const CASE_PRICES = [1, 5, 25, 100, 500, 2500, 12500, 62500, 312500, 1000000];
@@ -421,6 +594,7 @@ HTML_GAME = """
                 state.pendingWin = null;
                 updateBalanceUI();
                 resultMsg.textContent = `Выпало: ${winner.name} за ${formatMoney(winner.price)} — продано!`;
+                syncBalance();
             }
         }
         spinAnimId = requestAnimationFrame(animate);
@@ -521,17 +695,73 @@ HTML_GAME = """
     }
 
     buildCases();
-    updateBalanceUI();
+    fetchBalance();
 </script>
 </body>
 </html>
 """
 
+# --- API ДЛЯ ИГРЫ ---
 async def handle(request):
     return web.Response(text=HTML_GAME, content_type='text/html')
 
+async def api_get_balance(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    username = data.get('username', '')
+    first_name = data.get('first_name', '')
+    
+    if user_id:
+        conn = sqlite3.connect('game.db')
+        c = conn.cursor()
+        c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
+        row = c.fetchone()
+        if row is None:
+            c.execute('INSERT INTO users (user_id, username, first_name, balance) VALUES (?, ?, ?, 1.0)', (user_id, username, first_name))
+            conn.commit()
+            balance = 1.0
+        else:
+            balance = row[0]
+        conn.close()
+        return web.json_response({"balance": balance})
+    return web.json_response({"balance": 1.0})
+
+async def api_update_balance(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    username = data.get('username', '')
+    first_name = data.get('first_name', '')
+    balance = data.get('balance', 1.0)
+    
+    if user_id:
+        update_balance_in_db(user_id, username, first_name, balance)
+    return web.json_response({"status": "ok"})
+
+async def api_reset_balance(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    if user_id:
+        reset_user_balance(user_id)
+    return web.json_response({"status": "ok"})
+
+async def api_get_top(request):
+    top = get_top_players()
+    result = []
+    for row in top:
+        result.append({
+            "username": row[0],
+            "first_name": row[1],
+            "user_id": row[2],
+            "balance": row[3]
+        })
+    return web.json_response(result)
+
 app = web.Application()
 app.router.add_get('/', handle)
+app.router.add_post('/api/get_balance', api_get_balance)
+app.router.add_post('/api/update_balance', api_update_balance)
+app.router.add_post('/api/reset_balance', api_reset_balance)
+app.router.add_get('/api/get_top', api_get_top)
 
 async def main():
     runner = web.AppRunner(app)
