@@ -3,12 +3,16 @@ import logging
 import sqlite3
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.filters import Command, CommandStart, CommandObject
+from aiogram.types import (
+    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo,
+    InlineQueryResultArticle, InputTextMessageContent
+)
 
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = '8868918414:AAE7kUpC6aGfGeRzdASf7cKYWRwkhhhVZwA'
 WEBAPP_URL = 'https://genuine-creativity-production-58b6a574.up.railway.app'
+BOT_USERNAME = 'GameSeregabot'  # Имя вашего бота для инлайн-кнопки
 
 logging.basicConfig(level=logging.INFO)
 
@@ -61,13 +65,57 @@ def get_top_players():
 
 init_db()
 
-# --- ОБРАБОТЧИК КОМАНДЫ /start ---
-@dp.message(Command("start"))
+# --- ОБРАБОТЧИКИ КОМАНД БОТА ---
+@dp.message(CommandStart(deep_link=True))
+async def cmd_start_deeplink(message: types.Message, command: CommandObject):
+    # Если человек перешел по ссылке из инлайн-кнопки
+    if command.args == "play_game":
+        await show_game_menu(message)
+    else:
+        await cmd_start(message)
+
+@dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎮 Открыть игру", web_app=WebAppInfo(url=WEBAPP_URL))]
     ])
-    await message.answer("Привет! Нажми на кнопку ниже, чтобы открыть кейс-фарм.", reply_markup=kb)
+    await message.answer(
+        "Привет! Нажми на кнопку ниже, чтобы открыть кейс-фарм.\n\n"
+        "А еще ты можешь отправить меня в любой чат! Просто напиши в поле ввода:\n"
+        f"`@{BOT_USERNAME} Игра в кейсы заходи`", 
+        reply_markup=kb, 
+        parse_mode="Markdown"
+    )
+
+async def show_game_menu(message: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎮 Открыть игру", web_app=WebAppInfo(url=WEBAPP_URL))]
+    ])
+    await message.answer("Добро пожаловать в игру! Жми кнопку ниже, чтобы начать.", reply_markup=kb)
+
+# --- ИНЛАЙН РЕЖИМ ---
+@dp.inline_query()
+async def inline_query_handler(inline_query: types.InlineQuery):
+    msg_text = "🔥 <b>Кейсфарм</b> — игра про открытие кейсов!\nЗаходи и попробуй выбить AK47 за триллион долларов."
+    deep_link = f"https://t.me/{BOT_USERNAME}?start=play_game"
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎮 Зайти", url=deep_link)]
+    ])
+
+    result = InlineQueryResultArticle(
+        id="casefarm_game",
+        title="Игра в кейсы",
+        description="Нажми, чтобы отправить приглашение в игру",
+        input_message_content=InputTextMessageContent(
+            message_text=msg_text,
+            parse_mode="HTML"
+        ),
+        reply_markup=kb,
+        thumb_url="https://cdn-icons-png.flaticon.com/512/2592/2592989.png"
+    )
+
+    await inline_query.answer([result], cache_time=1)
 
 # --- HTML/JS КОД МИНИ-ИГРЫ ---
 HTML_GAME = """
@@ -133,7 +181,6 @@ HTML_GAME = """
 
     #snowCanvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
-    /* ИСПРАВЛЕННЫЙ БЛОК ПРОКРУТКИ */
     #casesScreen, #freeCasesScreen { justify-content: flex-start; gap: 15px; height: 100%; overflow: hidden; }
     .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; flex-shrink: 0; }
     .balance { font-size: 20px; font-weight: bold; color: #333; background-color: #e6e6e6; padding: 6px 14px; border-radius: 6px; }
@@ -475,7 +522,6 @@ HTML_GAME = """
         openBalance.textContent = txt;
     }
 
-    // ИСПРАВЛЕННАЯ ФУНКЦИЯ ФОРМАТИРОВАНИЯ (без букв "e")
     function formatMoney(v) {
         if (!isFinite(v)) return '∞$';
         
@@ -501,7 +547,6 @@ HTML_GAME = """
         return intPart + '$';
     }
 
-    // Генерация кейсов от 1 до 931 триллиона (умножение на 5)
     const CASE_PRICES = [];
     let p = 1;
     for (let i = 0; i < 30; i++) {
