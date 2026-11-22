@@ -423,7 +423,7 @@ HTML_GAME = """
                 const div = document.createElement('div');
                 div.className = 'top-row';
                 const name = user.username ? '@' + user.username : (user.first_name || 'ID: ' + user.user_id);
-                div.innerHTML = `<span>${index + 1}. ${name}</span> <span>${user.balance}$</span>`;
+                div.innerHTML = `<span>${index + 1}. ${name}</span> <span>${formatMoney(user.balance)}</span>`;
                 topTable.appendChild(div);
             });
         } catch (e) {
@@ -475,10 +475,30 @@ HTML_GAME = """
         openBalance.textContent = txt;
     }
 
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ ФОРМАТИРОВАНИЯ (без букв "e")
     function formatMoney(v) {
-        if (v >= 1e15) return v.toExponential(2).replace('+', '') + '$';
-        if (Number.isInteger(v)) return v.toLocaleString('ru-RU') + '$';
-        return v.toFixed(2).replace(/\.?0+$/, '') + '$';
+        if (!isFinite(v)) return '∞$';
+        
+        let str;
+        if (Number.isInteger(v)) {
+            str = v.toLocaleString('fullwide', {useGrouping: false});
+        } else {
+            str = v.toFixed(2);
+        }
+
+        let parts = str.split('.');
+        let intPart = parts[0];
+        let decPart = parts[1];
+
+        intPart = intPart.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ');
+
+        if (decPart) {
+            decPart = decPart.replace(/0+$/, '');
+            if (decPart === '') return intPart + '$';
+            return intPart + '.' + decPart + '$';
+        }
+        
+        return intPart + '$';
     }
 
     // Генерация кейсов от 1 до 931 триллиона (умножение на 5)
