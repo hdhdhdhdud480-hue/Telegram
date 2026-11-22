@@ -98,7 +98,7 @@ HTML_GAME = """
     h1 { color: #333; font-size: 28px; letter-spacing: 1px; z-index: 2; transition: color 0.3s ease; }
     body.dark h1 { color: #fff; }
 
-    .screen { display: none; flex-direction: column; align-items: center; justify-content: space-between; width: 100%; flex: 1; z-index: 2; }
+    .screen { display: none; flex-direction: column; align-items: center; justify-content: space-between; width: 100%; flex: 1; z-index: 2; height: 100%; }
     .screen.active { display: flex; }
     .content { display: flex; flex-direction: column; align-items: center; gap: 15px; }
 
@@ -133,13 +133,14 @@ HTML_GAME = """
 
     #snowCanvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
-    #casesScreen, #freeCasesScreen { justify-content: flex-start; gap: 15px; }
-    .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+    /* ИСПРАВЛЕННЫЙ БЛОК ПРОКРУТКИ */
+    #casesScreen, #freeCasesScreen { justify-content: flex-start; gap: 15px; height: 100%; overflow: hidden; }
+    .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; flex-shrink: 0; }
     .balance { font-size: 20px; font-weight: bold; color: #333; background-color: #e6e6e6; padding: 6px 14px; border-radius: 6px; }
     body.dark .balance { color: #fff; background-color: #7d7d7d; }
 
-    .cases-layout { display: flex; width: 100%; flex: 1; gap: 15px; z-index: 2; padding-top: 10px; overflow-y: auto; }
-    .cases-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 280px; padding-bottom: 20px; }
+    .cases-layout { display: flex; width: 100%; flex: 1; gap: 15px; z-index: 2; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 20px; }
+    .cases-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 280px; margin: 0 auto; }
     .case-btn {
         background-color: #b0b0b0; color: #fff; border: none; border-radius: 6px;
         font-size: 16px; font-weight: bold; padding: 12px 20px; cursor: pointer; width: 100%; transition: background-color 0.2s;
