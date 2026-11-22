@@ -12,7 +12,7 @@ from aiogram.types import (
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = '8868918414:AAE7kUpC6aGfGeRzdASf7cKYWRwkhhhVZwA'
 WEBAPP_URL = 'https://genuine-creativity-production-58b6a574.up.railway.app'
-BOT_USERNAME = 'GameSeregabot'  # Имя вашего бота для инлайн-кнопки
+BOT_USERNAME = 'GameSeregabot'
 
 logging.basicConfig(level=logging.INFO)
 
@@ -68,7 +68,6 @@ init_db()
 # --- ОБРАБОТЧИКИ КОМАНД БОТА ---
 @dp.message(CommandStart(deep_link=True))
 async def cmd_start_deeplink(message: types.Message, command: CommandObject):
-    # Если человек перешел по ссылке из инлайн-кнопки
     if command.args == "play_game":
         await show_game_menu(message)
     else:
@@ -523,6 +522,7 @@ HTML_GAME = """
     }
 
     function formatMoney(v) {
+        if (v >= 1e20) return '∞$'; 
         if (!isFinite(v)) return '∞$';
         
         let str;
@@ -871,7 +871,7 @@ async def api_get_balance(request):
     first_name = data.get('first_name', '')
     
     if user_id:
-        conn = sqlite3.connect('game.db')
+        conn = sqlite3.connect('/app/game.db')
         c = conn.cursor()
         c.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
         row = c.fetchone()
