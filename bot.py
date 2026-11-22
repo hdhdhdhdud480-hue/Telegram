@@ -182,7 +182,6 @@ HTML_GAME = """
 
     .ak-svg { width: 90px; height: 45px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
 
-    /* Стили для топа */
     .top-table { width: 100%; max-width: 350px; background: #e6e6e6; border-radius: 8px; overflow: hidden; z-index: 2; }
     body.dark .top-table { background: #7d7d7d; }
     .top-row { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #ccc; font-size: 14px; color: #333; }
@@ -192,7 +191,6 @@ HTML_GAME = """
     .top-row:nth-child(2) { background: #c0c0c0; font-weight: bold; color: #000; }
     .top-row:nth-child(3) { background: #cd7f32; font-weight: bold; color: #000; }
 
-    /* Стили для предупреждения */
     .warning-box { background: #fff3cd; border: 2px solid #ffc107; padding: 15px; border-radius: 8px; text-align: center; max-width: 300px; z-index: 2; }
     body.dark .warning-box { background: #4a4a4a; border-color: #888; color: #fff; }
     .btn-red { background: #dc3545; }
@@ -477,11 +475,19 @@ HTML_GAME = """
     }
 
     function formatMoney(v) {
-        if (Number.isInteger(v)) return v + '$';
+        if (v >= 1e15) return v.toExponential(2).replace('+', '') + '$';
+        if (Number.isInteger(v)) return v.toLocaleString('ru-RU') + '$';
         return v.toFixed(2).replace(/\.?0+$/, '') + '$';
     }
 
-    const CASE_PRICES = [1, 5, 25, 100, 500, 2500, 12500, 62500, 312500, 1000000, 5000000, 25000000, 100000000, 500000000, 1000000000, 1000000000000];
+    // Генерация кейсов от 1 до 931 триллиона (умножение на 5)
+    const CASE_PRICES = [];
+    let p = 1;
+    for (let i = 0; i < 30; i++) {
+        CASE_PRICES.push(p);
+        p *= 5;
+    }
+
     const CASE_MULTIPLIERS = [1.2, 1.6, 2, 2.5, 3];
 
     function getSkinsForCase(casePrice) {
