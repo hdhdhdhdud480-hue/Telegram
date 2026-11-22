@@ -133,20 +133,20 @@ HTML_GAME = """
 
     #snowCanvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
-    #casesScreen { justify-content: flex-start; gap: 15px; }
+    #casesScreen, #freeCasesScreen { justify-content: flex-start; gap: 15px; }
     .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
     .balance { font-size: 20px; font-weight: bold; color: #333; background-color: #e6e6e6; padding: 6px 14px; border-radius: 6px; }
     body.dark .balance { color: #fff; background-color: #7d7d7d; }
 
-    .cases-layout { display: flex; width: 100%; flex: 1; gap: 15px; z-index: 2; padding-top: 10px; }
-    .cases-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 280px; }
+    .cases-layout { display: flex; width: 100%; flex: 1; gap: 15px; z-index: 2; padding-top: 10px; overflow-y: auto; }
+    .cases-grid { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; max-width: 280px; padding-bottom: 20px; }
     .case-btn {
         background-color: #b0b0b0; color: #fff; border: none; border-radius: 6px;
         font-size: 16px; font-weight: bold; padding: 12px 20px; cursor: pointer; width: 100%; transition: background-color 0.2s;
     }
     .case-btn:active { background-color: #707070; }
 
-    #openScreen { justify-content: space-between; gap: 10px; }
+    #openScreen, #freeOpenScreen { justify-content: space-between; gap: 10px; }
     .open-top { width: 100%; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
     .open-title { font-size: 18px; font-weight: bold; color: #333; }
     body.dark .open-title { color: #fff; }
@@ -196,9 +196,9 @@ HTML_GAME = """
     .warning-box { background: #fff3cd; border: 2px solid #ffc107; padding: 15px; border-radius: 8px; text-align: center; max-width: 300px; z-index: 2; }
     body.dark .warning-box { background: #4a4a4a; border-color: #888; color: #fff; }
     .btn-red { background: #dc3545; }
-    .btn-red:hover { background: #c82333; }
+    .btn-red:hover { background-color: #c82333; }
     .btn-green { background: #28a745; }
-    .btn-green:hover { background: #218838; }
+    .btn-green:hover { background-color: #218838; }
 </style>
 </head>
 <body>
@@ -212,7 +212,7 @@ HTML_GAME = """
         <button class="btn" id="openSettings">Настройки</button>
         <button class="btn" id="openTop">🏆 Топ игроков</button>
     </div>
-    <button class="btn">Свободный режим</button>
+    <button class="btn" id="freeModeBtn">Свободный режим</button>
 </div>
 
 <div class="screen" id="settingsScreen">
@@ -236,7 +236,6 @@ HTML_GAME = """
     </div>
 </div>
 
-<!-- Экран предупреждения -->
 <div class="screen" id="warningScreen">
     <h1>Внимание</h1>
     <div class="warning-box">
@@ -259,6 +258,16 @@ HTML_GAME = """
     </div>
 </div>
 
+<div class="screen" id="freeCasesScreen">
+    <div class="top-bar">
+        <div class="balance">Свободный режим (1$)</div>
+        <button class="btn" id="freeCasesExitBtn" style="padding:8px 16px; font-size:14px;">Выход</button>
+    </div>
+    <div class="cases-layout">
+        <div class="cases-grid" id="freeCasesGrid"></div>
+    </div>
+</div>
+
 <div class="screen" id="openScreen">
     <div class="open-top">
         <div class="open-title" id="openTitle">Кейс 1$</div>
@@ -277,6 +286,24 @@ HTML_GAME = """
     </div>
 </div>
 
+<div class="screen" id="freeOpenScreen">
+    <div class="open-top">
+        <div class="open-title" id="freeOpenTitle">Кейс 1$ (Свободный)</div>
+        <div class="balance">Бесконечно</div>
+    </div>
+    <div class="roulette-wrap">
+        <div class="roulette-strip" id="freeRouletteStrip"></div>
+        <div class="roulette-center-line"></div>
+    </div>
+    <div class="chances" id="freeChancesList"></div>
+    <div class="result-msg" id="freeResultMsg"></div>
+    <div class="open-bottom">
+        <button class="btn" id="freeOpenCaseBtn" style="font-size:16px; padding:12px 24px;">Открыть</button>
+        <button class="btn" id="freeFastSpinBtn" style="font-size:16px; padding:12px 24px;">Быстро</button>
+        <button class="btn" id="freeOpenExitBtn" style="font-size:16px; padding:12px 24px;">Выход</button>
+    </div>
+</div>
+
 <div class="screen" id="topScreen">
     <h1>🏆 Топ игроков</h1>
     <div class="top-table" id="topTable"></div>
@@ -287,7 +314,7 @@ HTML_GAME = """
     let tg = window.Telegram.WebApp;
     tg.expand();
 
-    const state = { snow: false, dark: false, balance: 1, currentCase: null, spinning: false, pendingWin: null };
+    const state = { snow: false, dark: false, balance: 1, currentCase: null, spinning: false, pendingWin: null, isFreeMode: false };
     const userId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
     const username = tg.initDataUnsafe.user ? (tg.initDataUnsafe.user.username || '') : '';
     const firstName = tg.initDataUnsafe.user ? (tg.initDataUnsafe.user.first_name || 'Игрок') : 'Игрок';
@@ -298,6 +325,8 @@ HTML_GAME = """
     const openScreen = document.getElementById('openScreen');
     const topScreen = document.getElementById('topScreen');
     const warningScreen = document.getElementById('warningScreen');
+    const freeCasesScreen = document.getElementById('freeCasesScreen');
+    const freeOpenScreen = document.getElementById('freeOpenScreen');
 
     const playBtn = document.getElementById('playBtn');
     const openSettingsBtn = document.getElementById('openSettings');
@@ -306,6 +335,9 @@ HTML_GAME = """
     const openExitBtn = document.getElementById('openExitBtn');
     const openTopBtn = document.getElementById('openTop');
     const topExitBtn = document.getElementById('topExitBtn');
+    const freeModeBtn = document.getElementById('freeModeBtn');
+    const freeCasesExitBtn = document.getElementById('freeCasesExitBtn');
+    const freeOpenExitBtn = document.getElementById('freeOpenExitBtn');
     
     const newGameBtn = document.getElementById('newGameBtn');
     const confirmNewGame = document.getElementById('confirmNewGame');
@@ -319,6 +351,7 @@ HTML_GAME = """
     const balanceDisplay = document.getElementById('balanceDisplay');
     const openBalance = document.getElementById('openBalance');
     const casesGrid = document.getElementById('casesGrid');
+    const freeCasesGrid = document.getElementById('freeCasesGrid');
     const openTitle = document.getElementById('openTitle');
     const rouletteStrip = document.getElementById('rouletteStrip');
     const chancesList = document.getElementById('chancesList');
@@ -327,13 +360,19 @@ HTML_GAME = """
     const fastSpinBtn = document.getElementById('fastSpinBtn');
     const topTable = document.getElementById('topTable');
 
+    const freeOpenTitle = document.getElementById('freeOpenTitle');
+    const freeRouletteStrip = document.getElementById('freeRouletteStrip');
+    const freeChancesList = document.getElementById('freeChancesList');
+    const freeResultMsg = document.getElementById('freeResultMsg');
+    const freeOpenCaseBtn = document.getElementById('freeOpenCaseBtn');
+    const freeFastSpinBtn = document.getElementById('freeFastSpinBtn');
+
     function showScreen(screen) {
-        [mainScreen, settingsScreen, casesScreen, openScreen, topScreen, warningScreen].forEach(s => s.classList.remove('active'));
+        [mainScreen, settingsScreen, casesScreen, openScreen, topScreen, warningScreen, freeCasesScreen, freeOpenScreen].forEach(s => s.classList.remove('active'));
         screen.classList.add('active');
         updateSnow();
     }
 
-    // --- СИНХРОНИЗАЦИЯ С БАЗОЙ ---
     async function fetchBalance() {
         if (!userId) return;
         try {
@@ -393,14 +432,20 @@ HTML_GAME = """
         }
     }
 
-    playBtn.addEventListener('click', () => { fetchBalance(); showScreen(casesScreen); });
+    playBtn.addEventListener('click', () => { state.isFreeMode = false; fetchBalance(); showScreen(casesScreen); });
     openSettingsBtn.addEventListener('click', () => showScreen(settingsScreen));
     backBtn.addEventListener('click', () => showScreen(mainScreen));
     casesExitBtn.addEventListener('click', () => { syncBalance(); showScreen(mainScreen); });
     openTopBtn.addEventListener('click', () => { loadTop(); showScreen(topScreen); });
     topExitBtn.addEventListener('click', () => showScreen(mainScreen));
+    
+    freeModeBtn.addEventListener('click', () => {
+        state.isFreeMode = true;
+        buildFreeCases();
+        showScreen(freeCasesScreen);
+    });
+    freeCasesExitBtn.addEventListener('click', () => showScreen(mainScreen));
 
-    // Логика новой игры
     newGameBtn.addEventListener('click', () => showScreen(warningScreen));
     cancelNewGame.addEventListener('click', () => showScreen(settingsScreen));
     confirmNewGame.addEventListener('click', async () => {
@@ -420,6 +465,11 @@ HTML_GAME = """
         showScreen(casesScreen);
     });
 
+    freeOpenExitBtn.addEventListener('click', () => {
+        stopSpin();
+        showScreen(freeCasesScreen);
+    });
+
     function updateBalanceUI() {
         const txt = formatMoney(state.balance);
         balanceDisplay.textContent = txt;
@@ -431,7 +481,7 @@ HTML_GAME = """
         return v.toFixed(2).replace(/\.?0+$/, '') + '$';
     }
 
-    const CASE_PRICES = [1, 5, 25, 100, 500, 2500, 12500, 62500, 312500, 1000000];
+    const CASE_PRICES = [1, 5, 25, 100, 500, 2500, 12500, 62500, 312500, 1000000, 5000000, 25000000, 100000000, 500000000, 1000000000, 1000000000000];
     const CASE_MULTIPLIERS = [1.2, 1.6, 2, 2.5, 3];
 
     function getSkinsForCase(casePrice) {
@@ -453,15 +503,37 @@ HTML_GAME = """
         });
     }
 
+    function buildFreeCases() {
+        freeCasesGrid.innerHTML = '';
+        CASE_PRICES.forEach(price => {
+            const btn = document.createElement('button');
+            btn.className = 'case-btn';
+            btn.textContent = formatMoney(price) + ' кейс';
+            btn.addEventListener('click', () => openFreeCase(price));
+            freeCasesGrid.appendChild(btn);
+        });
+    }
+
     function openCase(price) {
         state.currentCase = { price: price, skins: getSkinsForCase(price) };
         openTitle.textContent = 'Кейс ' + formatMoney(price);
         updateBalanceUI();
         resultMsg.textContent = '';
         state.pendingWin = null;
-        buildRoulettePreview(state.currentCase.skins);
-        buildChances(state.currentCase.skins);
+        buildRoulettePreview(state.currentCase.skins, rouletteStrip);
+        buildChances(state.currentCase.skins, chancesList);
         showScreen(openScreen);
+        stopSpin();
+    }
+
+    function openFreeCase(price) {
+        state.currentCase = { price: price, skins: getSkinsForCase(price) };
+        freeOpenTitle.textContent = 'Кейс ' + formatMoney(price) + ' (Свободный)';
+        freeResultMsg.textContent = '';
+        state.pendingWin = null;
+        buildRoulettePreview(state.currentCase.skins, freeRouletteStrip);
+        buildChances(state.currentCase.skins, freeChancesList);
+        showScreen(freeOpenScreen);
         stopSpin();
     }
 
@@ -496,12 +568,12 @@ HTML_GAME = """
         </svg>`;
     }
 
-    function buildRoulettePreview(skins) {
-        rouletteStrip.innerHTML = '';
-        rouletteStrip.style.transform = 'translateX(0)';
+    function buildRoulettePreview(skins, stripElement) {
+        stripElement.innerHTML = '';
+        stripElement.style.transform = 'translateX(0)';
         for (let i = 0; i < 30; i++) {
             const sk = skins[Math.floor(Math.random() * skins.length)];
-            rouletteStrip.appendChild(makeRouletteItem(sk));
+            stripElement.appendChild(makeRouletteItem(sk));
         }
     }
 
@@ -525,13 +597,13 @@ HTML_GAME = """
         return div;
     }
 
-    function buildChances(skins) {
-        chancesList.innerHTML = '';
+    function buildChances(skins, listElement) {
+        listElement.innerHTML = '';
         skins.forEach(sk => {
             const el = document.createElement('div');
             el.className = 'chance-item';
             el.textContent = `${formatMoney(sk.price)} — ${sk.chance}%`;
-            chancesList.appendChild(el);
+            listElement.appendChild(el);
         });
     }
 
@@ -542,17 +614,22 @@ HTML_GAME = """
         state.spinning = false;
     }
 
-    function startSpin(fast) {
+    function startSpin(isFree, fast) {
         if (state.spinning) return;
         if (!state.currentCase) return;
-        if (state.balance < state.currentCase.price) {
+
+        if (!isFree && state.balance < state.currentCase.price) {
             resultMsg.textContent = 'Недостаточно средств!';
             return;
         }
 
-        state.balance = round2(state.balance - state.currentCase.price);
-        updateBalanceUI();
-        resultMsg.textContent = '';
+        if (!isFree) {
+            state.balance = round2(state.balance - state.currentCase.price);
+            updateBalanceUI();
+            resultMsg.textContent = '';
+        } else {
+            freeResultMsg.textContent = '';
+        }
 
         const winnerIndex = pickByChance(state.currentCase.skins);
         const winner = state.currentCase.skins[winnerIndex];
@@ -560,16 +637,18 @@ HTML_GAME = """
 
         const totalItems = fast ? 40 : 60;
         const winnerPos = fast ? 30 : 50;
-        rouletteStrip.innerHTML = '';
+        const stripElement = isFree ? freeRouletteStrip : rouletteStrip;
+        
+        stripElement.innerHTML = '';
         for (let i = 0; i < totalItems; i++) {
             const sk = (i === winnerPos) ? winner : state.currentCase.skins[Math.floor(Math.random() * state.currentCase.skins.length)];
-            rouletteStrip.appendChild(makeRouletteItem(sk));
+            stripElement.appendChild(makeRouletteItem(sk));
         }
-        rouletteStrip.style.transform = 'translateX(0)';
+        stripElement.style.transform = 'translateX(0)';
 
         state.spinning = true;
         const itemWidth = 128;
-        const wrapWidth = rouletteStrip.parentElement.clientWidth;
+        const wrapWidth = stripElement.parentElement.clientWidth;
         const centerOffset = wrapWidth / 2;
         const targetX = -(winnerPos * itemWidth + itemWidth / 2 - centerOffset);
 
@@ -583,25 +662,32 @@ HTML_GAME = """
             let t = Math.min(elapsed / duration, 1);
             const eased = easeOut(t);
             const x = startX + (targetX - startX) * eased;
-            rouletteStrip.style.transform = `translateX(${x}px)`;
+            stripElement.style.transform = `translateX(${x}px)`;
 
             if (t < 1) {
                 spinAnimId = requestAnimationFrame(animate);
             } else {
                 state.spinning = false;
                 spinAnimId = null;
-                state.balance = round2(state.balance + winner.price);
                 state.pendingWin = null;
-                updateBalanceUI();
-                resultMsg.textContent = `Выпало: ${winner.name} за ${formatMoney(winner.price)} — продано!`;
-                syncBalance();
+                
+                if (isFree) {
+                    freeResultMsg.textContent = `Выпало: ${winner.name} за ${formatMoney(winner.price)} (Свободный режим)`;
+                } else {
+                    state.balance = round2(state.balance + winner.price);
+                    updateBalanceUI();
+                    resultMsg.textContent = `Выпало: ${winner.name} за ${formatMoney(winner.price)} — продано!`;
+                    syncBalance();
+                }
             }
         }
         spinAnimId = requestAnimationFrame(animate);
     }
 
-    openCaseBtn.addEventListener('click', () => startSpin(false));
-    fastSpinBtn.addEventListener('click', () => startSpin(true));
+    openCaseBtn.addEventListener('click', () => startSpin(false, false));
+    fastSpinBtn.addEventListener('click', () => startSpin(false, true));
+    freeOpenCaseBtn.addEventListener('click', () => startSpin(true, false));
+    freeFastSpinBtn.addEventListener('click', () => startSpin(true, true));
 
     function pickByChance(skins) {
         const total = skins.reduce((s, x) => s + x.chance, 0);
@@ -614,7 +700,8 @@ HTML_GAME = """
     }
 
     function updateSnow() {
-        if (state.snow && !openScreen.classList.contains('active')) {
+        const isOpenScreen = openScreen.classList.contains('active') || freeOpenScreen.classList.contains('active');
+        if (state.snow && !isOpenScreen) {
             canvas.style.display = 'block';
             startSnow();
         } else {
